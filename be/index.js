@@ -1,12 +1,17 @@
 const express = require('express');
 const http = require('http');
-const WebSocket = require('ws');
 const cors = require('cors');
+const { Server } = require('socket.io');
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const io = new Server(server, {
+  path: '/api/socket.io', // Use a specific path for Socket.IO if needed
+  cors: {
+    origin: '*', // Adjust to your needs
+  },
+});
 
 // Use CORS middleware
 app.use(cors());
@@ -14,40 +19,29 @@ app.use(cors());
 // Store sessions and clients
 const sessions = {};
 
-wss.on('connection', (ws) => {
+io.on('connection', (socket) => {
   let currentSessionId = null;
 
-  ws.on('message', (message) => {
-    const data = JSON.parse(message);
+  socket.on('join', (sessionId) => {
+    currentSessionId = sessionId;
+    if (!sessions[currentSessionId]) {
+      sessions[currentSessionId] = [];
+    }
+    sessions[currentSessionId].push(socket);
 
-    switch (data.type) {
-      case 'join':
-        currentSessionId = data.sessionId;
-        if (!sessions[currentSessionId]) {
-          sessions[currentSessionId] = [];
-        }
-        sessions[currentSessionId].push(ws);
-        break;
+    socket.join(sessionId);
+  });
 
-      case 'codeUpdate':
-        const clients = sessions[data.sessionId];
-        if (clients) {
-          clients.forEach(client => {
-            if (client !== ws) {
-              client.send(JSON.stringify({
-                type: 'codeUpdate',
-                code: data.code
-              }));
-            }
-          });
-        }
-        break;
+  socket.on('codeUpdate', (data) => {
+    const { sessionId, code } = data;
+    if (sessions[sessionId]) {
+      socket.to(sessionId).emit('codeUpdate', { code });
     }
   });
 
-  ws.on('close', () => {
+  socket.on('disconnect', () => {
     if (currentSessionId && sessions[currentSessionId]) {
-      sessions[currentSessionId] = sessions[currentSessionId].filter(client => client !== ws);
+      sessions[currentSessionId] = sessions[currentSessionId].filter(client => client !== socket);
       if (sessions[currentSessionId].length === 0) {
         delete sessions[currentSessionId];
       }
@@ -62,5 +56,5 @@ app.get("/", (req, res) => {
 
 // Start the server
 server.listen(3001, () => {
-  console.log('WebSocket server is running on port 3001');
+  console.log('Socket.IO server is running on port 3001');
 });
