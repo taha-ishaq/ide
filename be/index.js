@@ -25,14 +25,18 @@ wss.on('connection', (ws) => {
       }
     });
   });
-app.get("/",()=>{
-   res.send("Hellow world")
-})
+
   ws.on('close', () => {
     delete clients[clientId]; // Remove client on disconnection
   });
 });
 
+// Define a simple route for testing
+app.get("/", (req, res) => {
+  res.send("Hello world");
+});
+
+// Start the server
 server.listen(3001, () => {
   console.log('WebSocket server is running on port 3001');
 });
