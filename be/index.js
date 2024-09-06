@@ -11,27 +11,41 @@ const wss = new WebSocket.Server({ server });
 // Use CORS middleware
 app.use(cors());
 
-// Store clients
-let clients = {};
+// Store sessions and clients
+let sessions = {};
 
 // Handle new connections
 wss.on('connection', (ws) => {
-  const clientId = Date.now(); // unique client ID based on timestamp
-  clients[clientId] = ws;
+  let sessionId = null;
 
   ws.on('message', (message) => {
     const data = JSON.parse(message);
-
-    // Broadcast message to all other clients except sender
-    Object.keys(clients).forEach((id) => {
-      if (id !== clientId.toString()) {
-        clients[id].send(JSON.stringify(data));
+    
+    if (data.type === 'join') {
+      // Join a session
+      sessionId = data.sessionId;
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = [];
       }
-    });
+      sessions[sessionId].push(ws);
+    } else if (data.type === 'codeUpdate' && sessionId) {
+      // Broadcast code updates to all clients in the same session
+      sessions[sessionId].forEach(client => {
+        if (client !== ws) {
+          client.send(JSON.stringify({ type: 'codeUpdate', code: data.code }));
+        }
+      });
+    }
   });
 
   ws.on('close', () => {
-    delete clients[clientId]; // Remove client on disconnection
+    if (sessionId) {
+      // Remove client from session on disconnection
+      sessions[sessionId] = sessions[sessionId].filter(client => client !== ws);
+      if (sessions[sessionId].length === 0) {
+        delete sessions[sessionId]; // Remove session if no clients are left
+      }
+    }
   });
 });
 
