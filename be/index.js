@@ -12,38 +12,44 @@ const wss = new WebSocket.Server({ server });
 app.use(cors());
 
 // Store sessions and clients
-let sessions = {};
+const sessions = {};
 
-// Handle new connections
 wss.on('connection', (ws) => {
-  let sessionId = null;
+  let currentSessionId = null;
 
   ws.on('message', (message) => {
     const data = JSON.parse(message);
-    
-    if (data.type === 'join') {
-      // Join a session
-      sessionId = data.sessionId;
-      if (!sessions[sessionId]) {
-        sessions[sessionId] = [];
-      }
-      sessions[sessionId].push(ws);
-    } else if (data.type === 'codeUpdate' && sessionId) {
-      // Broadcast code updates to all clients in the same session
-      sessions[sessionId].forEach(client => {
-        if (client !== ws) {
-          client.send(JSON.stringify({ type: 'codeUpdate', code: data.code }));
+
+    switch (data.type) {
+      case 'join':
+        currentSessionId = data.sessionId;
+        if (!sessions[currentSessionId]) {
+          sessions[currentSessionId] = [];
         }
-      });
+        sessions[currentSessionId].push(ws);
+        break;
+
+      case 'codeUpdate':
+        const clients = sessions[data.sessionId];
+        if (clients) {
+          clients.forEach(client => {
+            if (client !== ws) {
+              client.send(JSON.stringify({
+                type: 'codeUpdate',
+                code: data.code
+              }));
+            }
+          });
+        }
+        break;
     }
   });
 
   ws.on('close', () => {
-    if (sessionId) {
-      // Remove client from session on disconnection
-      sessions[sessionId] = sessions[sessionId].filter(client => client !== ws);
-      if (sessions[sessionId].length === 0) {
-        delete sessions[sessionId]; // Remove session if no clients are left
+    if (currentSessionId && sessions[currentSessionId]) {
+      sessions[currentSessionId] = sessions[currentSessionId].filter(client => client !== ws);
+      if (sessions[currentSessionId].length === 0) {
+        delete sessions[currentSessionId];
       }
     }
   });
