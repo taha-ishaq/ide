@@ -25,7 +25,9 @@ wss.on('connection', (ws) => {
       }
     });
   });
-
+app.get("/",()=>{
+   res.send("Hellow world")
+})
   ws.on('close', () => {
     delete clients[clientId]; // Remove client on disconnection
   });
