@@ -1,11 +1,15 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+const cors = require('cors');
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// Use CORS middleware
+app.use(cors());
 
 // Store clients
 let clients = {};
